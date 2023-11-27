@@ -1,0 +1,131 @@
+version: '3.8'
+
+services:
+  mysqldb-order-service:
+    container_name: mysqldb-order-service
+    image: mysql
+    restart: unless-stopped
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_DATABASE: order_service
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: admin1234
+      MYSQL_ROOT_PASSWORD: root1234
+    networks:
+      - mp3-net
+
+  mysqldb-supplier-service:
+    container_name: mysqldb-supplier-service
+    image: mysql
+    restart: unless-stopped
+    ports:
+      - "3308:3306"
+    environment:
+      MYSQL_DATABASE: supplier_service
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: admin1234
+      MYSQL_ROOT_PASSWORD: root1234
+    networks:
+      - mp3-net
+
+  mysqldb-inventory-service:
+    container_name: mysqldb-inventory-service
+    image: mysql
+    restart: unless-stopped
+    ports:
+      - "3309:3306"
+    environment:
+      MYSQL_DATABASE: inventory_service
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: admin1234
+      MYSQL_ROOT_PASSWORD: root1234
+    networks:
+      - mp3-net
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.0
+    container_name: zookeeper
+    networks:
+      - mp3-net
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka-broker:
+    image: confluentinc/cp-kafka:7.3.0
+    container_name: kafka-broker
+    networks:
+      - mp3-net
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT, PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092, PLAINTEXT_INTERNAL://kafka-broker:29092
+      KAFKA-OFFSETS-TOPIC-REPLICATION-FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+  order-service:
+    container_name: order-service
+    build:
+      context: ./order-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      MYSQL_HOST: mysqldb-order-service
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: admin1234
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: 'kafka-broker:29092'
+    networks:
+      - mp3-net
+    depends_on:
+      - kafka-broker
+      - mysqldb-order-service
+
+  supplier-service:
+    container_name: supplier-service
+    build:
+      context: ./supplier-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      MYSQL_HOST: mysqldb-supplier-service
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: admin1234
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: 'kafka-broker:29092'
+    networks:
+      - mp3-net
+    depends_on:
+      - kafka-broker
+      - mysqldb-supplier-service
+
+  inventory-service:
+    container_name: inventory-service
+    build:
+      context: ./MP3-inventory-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      MYSQL_HOST: mysqldb-inventory-service
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: admin1234
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: 'kafka-broker:29092'
+    networks:
+      - mp3-net
+    depends_on:
+      - kafka-broker
+      - mysqldb-inventory-service
+
+networks:
+  mp3-net:
